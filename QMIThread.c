@@ -1857,9 +1857,10 @@ static int requestSetupDataCall(PROFILE_T *profile, int curIpFamily) {
             dbg_time("call_end_reason_type is %d", call_end_reason_type);
             dbg_time("call_end_reason_verbose is %d", verbose_call_end_reason);
         }
-
+        
+        USHORT err_code = le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
         free(pResponse);
-        return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
+        return err_code;
     }
 
     if (curIpFamily == IpFamilyV4) {

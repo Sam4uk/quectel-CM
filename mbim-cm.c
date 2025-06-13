@@ -1670,15 +1670,24 @@ static int mbim_status_code(MBIM_MESSAGE_HEADER *pMsgHdr) {
     return status;
 }
 
-#define mbim_check_err(err, pRequest, pCmdDone) do { \
-    int _status = mbim_status_code(pCmdDone ? &pCmdDone->MessageHeader : NULL); \
-    if (err || _status || !pCmdDone) { \
-        if (pCmdDone) { mbim_dump(&pCmdDone->MessageHeader, (mbim_verbose == 0)); } \
-        mbim_free(pRequest); mbim_free(pCmdDone); \
-        mbim_debug("%s:%d err=%d, Status=%d", __func__, __LINE__, err, _status); \
-        if (err) return err; if (_status) return _status; return 8888; \
-    } \
-} while(0)
+#define mbim_check_err(err, pRequest, pCmdDone)                                \
+  do {                                                                         \
+    int _status =                                                              \
+        mbim_status_code(pCmdDone ? &pCmdDone->MessageHeader : NULL);          \
+    if (err || _status || !pCmdDone) {                                         \
+      if (pCmdDone) {                                                          \
+        mbim_dump(&pCmdDone->MessageHeader, (mbim_verbose == 0));              \
+      }                                                                        \
+      mbim_free(pRequest);                                                     \
+      mbim_free(pCmdDone);                                                     \
+      mbim_debug("%s:%d err=%d, Status=%d", __func__, __LINE__, err, _status); \
+      if (err)                                                                 \
+        return err;                                                            \
+      if (_status)                                                             \
+        return _status;                                                        \
+      return 8888;                                                             \
+    }                                                                          \
+  } while (0)
 
 /*
  * MBIM device can be open repeatly without error
