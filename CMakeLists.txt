@@ -85,3 +85,52 @@ file(WRITE ${PROJECT_BINARY_DIR}/.gitignore
 *.*
 ]=====]
 )
+
+# Задаємо список VID_PID (кожен елемент - пара VID PID)
+set(VID_PID_LIST
+    "2c7c 0125"  # Перший пристрій
+    # "2c7c 0129"  # Другий пристрій
+    # "2c7c 0121"  # Третій пристрій
+)
+
+# Створюємо або очищуємо файл правил
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
+
+# Обробляємо кожен елемент списку
+foreach(item ${VID_PID_LIST})
+    # Розбиваємо рядок на VID та PID (через пробіл)
+    string(REPLACE " " ";" vid_pid_pair ${item})
+    list(GET vid_pid_pair 0 VID)
+    list(GET vid_pid_pair 1 PID)
+
+    # Додаємо правило для поточного VID/PID
+    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules"
+        "\n# Device ${VID}:${PID}\n"
+        "ACTION==\"add|change\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\",  ATTR{idProduct}==\"${PID}\", RUN+=\"/usr/local/bin/${PROJECT_NAME}.sh\"\n"
+    )
+endforeach()
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh" "#!/bin/bash\n")
+
+file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh"
+    "# Цей скрипт запускає програму від імені root\n"
+    "\n"
+    "# Логування (для дебагу)\n"
+    "echo \"[$(date)] Device connected! Running as root.\" >> /var/log/udev_root.log\n"
+    "\n"
+    "sleep 10"
+    "\n"
+    "# Запуск програми (шлях до бінарника)\n"
+    "/usr/local/bin/${PROJECT_NAME}-CM >> /var/log/${PROJECT_NAME}-CM.log 2>&1 &\n"
+    "\n"
+)
+
+execute_process(COMMAND chmod a+x "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh")
+
+
+install(TARGETS ${PROJECT_NAME}-qmi-proxy DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME}-mbim-proxy DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME}-CM DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh DESTINATION /usr/local/bin/)
