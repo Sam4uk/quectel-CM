@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.11)
 
-project(quectel)
+project(quectel
+        VERSION 1.6.2
+        DESCRIPTION "Connectivity Management Tool for USB network adapter of Quectel wireless cellular modules."
+        # HOMEPAGE_URL ""
+        # LANGUAGES C
+        )
 
 add_compile_options(
     -Wall 
@@ -85,3 +90,84 @@ file(WRITE ${PROJECT_BINARY_DIR}/.gitignore
 *.*
 ]=====]
 )
+
+# Задаємо список VID_PID (кожен елемент - пара VID PID)
+set(VID_PID_LIST
+    "2c7c 0125"  # Перший пристрій
+    # "2c7c 0129"  # Другий пристрій
+    # "2c7c 0121"  # Третій пристрій
+)
+
+set(INSTALL_BINDIR "/usr/local/bin/")
+
+# Створюємо або очищуємо файл правил
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
+
+# Обробляємо кожен елемент списку
+foreach(item ${VID_PID_LIST})
+    # Розбиваємо рядок на VID та PID (через пробіл)
+    string(REPLACE " " ";" vid_pid_pair ${item})
+    list(GET vid_pid_pair 0 VID)
+    list(GET vid_pid_pair 1 PID)
+
+    # Додаємо правило для поточного VID/PID
+    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules"
+        "\n# Device ${VID}:${PID}\n"
+        "ACTION==\"add|change\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\","
+        " ATTR{idProduct}==\"${PID}\", RUN+=\"${INSTALL_BINDIR}${PROJECT_NAME}.sh\"\n"
+    )
+endforeach()
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh" "#!/bin/bash\n")
+
+file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh"
+    "# Цей скрипт запускає програму від імені root\n"
+    "\n"
+    "# Логування (для дебагу)\n"
+    "echo \"[$(date)] Resetting EG25-G connected!\" >> /var/log/udev_root.log\n"
+    "\n"
+    "sleep 10"
+    "\n"
+    "# Запуск програми (шлях до бінарника)\n"
+    "${INSTALL_BINDIR}${PROJECT_NAME}-CM >> /var/log/${PROJECT_NAME}-CM.log 2>&1 &\n"
+    "\n"
+)
+
+execute_process(COMMAND chmod a+x "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh")
+
+
+install(TARGETS ${PROJECT_NAME}-qmi-proxy DESTINATION ${INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME}-mbim-proxy DESTINATION ${INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME}-CM DESTINATION ${INSTALL_BINDIR})
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.sh DESTINATION ${INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_SOURCE_DIR}/default.script DESTINATION /usr/share/udhcpc/)
+
+
+set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+set(CPACK_PACKAGE_VENDOR "Quectel Wireless Solution, Co., Ltd.")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Quectel Wireless Solution, Co., Ltd.")
+set(CPACK_PACKAGE_CONTACT "Sam4uk")# or CPACK_DEBIAN_PACKAGE_MAINTAINER)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28)")
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+# Автоматичне визначення архітектури для CPack
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8|armv7")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+endif()
+
+message(${CMAKE_SYSTEM_PROCESSOR})
+
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_SOURCE_DIR}/decription)
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${PROJECT_DESCRIPTION})
+set(CPACK_PACKAGE_HOMEPAGE_URL ${PROJECT_HOMEPAGE_URL})
+
+
+include(CPack)
