@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 
-project(quectel)
+project(quectel
+        VERSION 1.6.2)
 
 add_compile_options(
     -Wall 
