@@ -29,7 +29,7 @@ jobs:
       
       - name: make Debian Package
         run: |
-          cmake -B BUILD -DCMAKE_C_FLAGS="-Wno-unused-result" -DCMAKE_CXX_FLAGS="-Wno-unused-result" .
+          cmake -B BUILD -DCMAKE_C_FLAGS="-Wno-unused-result -Wno-stringop-overflow" -DCMAKE_CXX_FLAGS="-Wno-unused-result -Wno-stringop-overflow" .
           cmake --build BUILD -j$(nproc)
           tree
           echo "END"
