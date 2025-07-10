@@ -7,6 +7,8 @@ project(quectel
         # LANGUAGES C
         )
 
+set(GLIBC_VERION "2.28")
+
 add_compile_options(
     -Wall 
     -Werror 
@@ -14,11 +16,17 @@ add_compile_options(
     #-s
 )
 
+# add_link_options(
+#     # -Wl,--wrap
+# )
+
 link_libraries(
-    # pthread
-    # dl
-    # rt
+    pthread
+    dl
+    rt
 )
+
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--version-script=glibc_version.map")
 
 set(QL_CM_SRC
     QmiWwanCM.c GobiNetCM.c main.c MPQMUX.c QMIThread.c util.c qmap_bridge_mode.c mbim-cm.c device.c
@@ -30,6 +38,7 @@ if(1)
 else()
 endif()
 
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/glibc_version.map" "GLIBC_${GLIBC_VERION} {\n\t*;\n};")
 
 add_executable(${PROJECT_NAME}-qmi-proxy quectel-qmi-proxy.c)
 add_executable(${PROJECT_NAME}-mbim-proxy quectel-mbim-proxy.c)
@@ -149,7 +158,7 @@ set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_VENDOR "Quectel Wireless Solution, Co., Ltd.")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Quectel Wireless Solution, Co., Ltd.")
 set(CPACK_PACKAGE_CONTACT "Sam4uk")# or CPACK_DEBIAN_PACKAGE_MAINTAINER)
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= ${GLIBC_VERION})")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
@@ -160,8 +169,6 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8|armv7")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
     set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
 endif()
-
-message(${CMAKE_SYSTEM_PROCESSOR})
 
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_SOURCE_DIR}/decription)
