@@ -31,6 +31,7 @@ jobs:
         run: |
           cmake -B BUILD -DCMAKE_C_FLAGS="-Wno-unused-result -Wno-stringop-overflow" -DCMAKE_CXX_FLAGS="-Wno-unused-result -Wno-stringop-overflow" .
           cmake --build BUILD -j$(nproc)
+          cpack --config ./BUILD/CPackConfig.cmake  -G DEB
           tree
           echo "END"
 
