@@ -170,22 +170,42 @@ else()
 # Створюємо або очищуємо файл правил
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
 
-# Обробляємо кожен елемент списку
-foreach(item ${VID_PID_LIST})
-    # Розбиваємо рядок на VID та PID (через пробіл)
-    string(REPLACE " " ";" vid_pid_pair ${item})
-    list(GET vid_pid_pair 0 VID)
-    list(GET vid_pid_pair 1 PID)
+    # Обробляємо кожен елемент списку
+    foreach(item ${VID_PID_LIST})
+        # Розбиваємо рядок на VID та PID (через пробіл)
+        string(REPLACE " " ";" vid_pid_pair ${item})
+        list(GET vid_pid_pair 0 VID)
+        list(GET vid_pid_pair 1 PID)
 
-    # Додаємо правило для поточного VID/PID
-    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules"
-        "\n# Device ${VID}:${PID}\n"
-        "ACTION==\"add|change\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\","
-        " ATTR{idProduct}==\"${PID}\", RUN+=\"${INSTALL_BINDIR}${PROJECT_NAME}.sh\"\n"
-    )
-endforeach()
+        # Додаємо правило для поточного VID/PID
+        file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules"
+            "\n# Device ${VID}:${PID}\n"
+            "ACTION==\"add|change\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\","
+            " ATTR{idProduct}==\"${PID}\", RUN+=\"${INSTALL_BINDIR}${PROJECT_NAME}.sh\"\n"
+        )
+    endforeach()
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
+
+
+    file(WRITE "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules" "#\n")
+    foreach(DEVICE ${USB_DEVICES})
+        string(REPLACE ":" ";" DEVICE_LIST ${DEVICE})
+        # Розбиваємо рядок за допомогою списку (перший елемент - VID, другий - PID)
+        list(GET DEVICE_LIST 0 VID)
+        list(GET DEVICE_LIST 1 PID)
+
+
+        file(APPEND "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules"
+            "\n # Device ${VID}:${PID}\n")
+        file(APPEND "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules"
+            "ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\", ATTR{idProduct}==\"${PID}\", TEST==\"power/control\", ATTR{power/control}=\"on\"\n"
+        )
+    endforeach()
+
+    install(FILES "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules" DESTINATION /etc/udev/rules.d/)
+
+
 
 endif()
 
@@ -225,10 +245,21 @@ set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 
 # Автоматичне визначення архітектури для CPack
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8|armv7")
-    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
-    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+
+
+if(NOT CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686")
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "i386")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7l")
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "armhf")
+    else()
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
 endif()
 
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
