@@ -1,18 +1,64 @@
 cmake_minimum_required(VERSION 3.11)
 
+find_package(Git QUIET)
+
+if(GIT_FOUND)
+    # Отримати останній тег
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    # Отримати кількість комітів після тегу
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-list --count ${GIT_TAG}..HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE COMMITS_AFTER_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    # Отримати хеш поточного коміту
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+endif(GIT_FOUND)
+
+if(GIT_TAG)
+    string(REGEX REPLACE "^v" "" BASE_VERSION ${GIT_TAG})
+
+    if(COMMITS_AFTER_TAG AND NOT COMMITS_AFTER_TAG STREQUAL "0")
+        set(VERSION "${BASE_VERSION}.${COMMITS_AFTER_TAG}")
+    else()
+        set(VERSION "${BASE_VERSION}")
+    endif()
+else()
+    set(VERSION "0.0.0")
+endif()
+
 project(quectel
-        VERSION 1.6.2
-        DESCRIPTION "Connectivity Management Tool for USB network adapter of Quectel wireless cellular modules."
-        # HOMEPAGE_URL ""
-        # LANGUAGES C
-        )
+    VERSION ${VERSION}
+    DESCRIPTION "Connectivity Management Tool for USB network adapter of Quectel wireless cellular modules."
+    # HOMEPAGE_URL ""
+    # LANGUAGES C
+)
+
+message(STATUS ${PROJECT_NAME}-v${VERSION})
 
 set(GLIBC_VERION "2.28")
 
 add_compile_options(
-    -Wall 
-    -Werror 
-    -O1 
+    -Wall
+    -Werror
+    -O1
     #-s
 )
 
@@ -101,81 +147,82 @@ file(WRITE ${PROJECT_BINARY_DIR}/.gitignore
 )
 
 # Задаємо список VID_PID (кожен елемент - пара VID PID)
-set(VID_PID_LIST
-    "2c7c 0125"  # Перший пристрій
-    # "2c7c 0129"  # Другий пристрій
-    # "2c7c 0121"  # Третій пристрій
+set(USB_DEVICES
+    "2c7c:0125"
+    # "2c7c:0129"
+    # "2c7c:0121"
 )
 
 set(INSTALL_BINDIR "/usr/local/bin/")
 
-set(SPECIAL "ON")
+set(SPECIAL "OFF")
 
 if(${SPECIAL})
 
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service" "")
-file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service"
-"[Unit]\n"
-"Description=CM-loop\n"
-"\n"
-"[Service]\n"
-"ExecStart=${INSTALL_BINDIR}${PROJECT_NAME}_loop.sh\n"
-"Restart=always\n"
-"\n"
-"[Install]\n"
-"WantedBy=multi-user.target\n"
-)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service" "")
+    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service"
+        "[Unit]\n"
+        "Description=CM-loop\n"
+        "\n"
+        "[Service]\n"
+        "ExecStart=${INSTALL_BINDIR}${PROJECT_NAME}_loop.sh\n"
+        "Restart=always\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=multi-user.target\n"
+    )
 
 
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh" "#!/bin/bash\n")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh" "#!/bin/bash\n")
 
-file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh"
-    "# Цей скрипт запускає програму від імені root\n"
-    "\n"
-    "# Логування (для дебагу)\n"
-    "echo \"[$(date)] Resetting EG25-G connected!\" >> /var/log/udev_root.log\n"
-    "\n"
-    "# Запуск програми (шлях до бінарника)\n"
-    "while true; do\n\n"
-    ""
-    "if [ -e \"/dev/ttyUSB3\" ]; then\n"
+    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh"
+        "# Цей скрипт запускає програму від імені root\n"
+        "\n"
+        "# Логування (для дебагу)\n"
+        "echo \"[$(date)] Resetting EG25-G connected!\" >> /var/log/udev_root.log\n"
+        "\n"
+        "# Запуск програми (шлях до бінарника)\n"
+        "while true; do\n\n"
+        ""
+        "if [ -e \"/dev/ttyUSB3\" ]; then\n"
         "\tcount=$(pgrep -c quectel-CM)\n"
         "\tif [ $count -gt 0 ]; then\n"
-            "\t\techo \"quectel-CM запущено ($count процес(ів))\"\n"
-            "\t\techo \"PID: $(pgrep quectel-CM | tr '\\n' ' ')\"\n"
-            "\t\tsleep 30\n"
+        "\t\techo \"quectel-CM запущено ($count процес(ів))\"\n"
+        "\t\techo \"PID: $(pgrep quectel-CM | tr '\\n' ' ')\"\n"
+        "\t\tsleep 30\n"
         "\telse\n"
-            "\t\techo \"Lets GOOOO\"\n"
-            "\t\tsleep 10\n"
-            "\t\t/usr/local/bin/quectel-CM >> /var/log/quectel-CM.log 2>&1 &\n"
+        "\t\techo \"Lets GOOOO\"\n"
+        "\t\tsleep 10\n"
+        "\t\t/usr/local/bin/quectel-CM >> /var/log/quectel-CM.log 2>&1 &\n"
         "\tfi\n"
-    "else\n"
+        "else\n"
         "\techo \"Oh NOOOO\"\n"
         "\tsleep 10\n"
-    "fi\n"
-    ""
-    "done\n"
-    "sleep 10"
-    "\n"
-)
+        "fi\n"
+        ""
+        "done\n"
+        "sleep 10"
+        "\n"
+    )
 
-execute_process(COMMAND chmod a+x "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh")
+    execute_process(COMMAND chmod a+x "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh")
 
 
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service" DESTINATION /etc/systemd/system/)
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh" DESTINATION ${INSTALL_BINDIR})
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.service" DESTINATION /etc/systemd/system/)
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_loop.sh" DESTINATION ${INSTALL_BINDIR})
 
 else()
 
-# Створюємо або очищуємо файл правил
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
+    # Створюємо або очищуємо файл правил
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
 
     # Обробляємо кожен елемент списку
-    foreach(item ${VID_PID_LIST})
-        # Розбиваємо рядок на VID та PID (через пробіл)
-        string(REPLACE " " ";" vid_pid_pair ${item})
-        list(GET vid_pid_pair 0 VID)
-        list(GET vid_pid_pair 1 PID)
+    file(WRITE "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules" "# udev rules for ${PROJECT_NAME}\n")
+    foreach(DEVICE ${USB_DEVICES})
+        string(REPLACE ":" ";" DEVICE_LIST ${DEVICE})
+        # Розбиваємо рядок за допомогою списку (перший елемент - VID, другий - PID)
+        list(GET DEVICE_LIST 0 VID)
+        list(GET DEVICE_LIST 1 PID)
 
         # Додаємо правило для поточного VID/PID
         file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules"
@@ -183,19 +230,6 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules" "# udev rules 
             "ACTION==\"add|change\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\","
             " ATTR{idProduct}==\"${PID}\", RUN+=\"${INSTALL_BINDIR}${PROJECT_NAME}.sh\"\n"
         )
-    endforeach()
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
-
-
-    file(WRITE "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules" "#\n")
-    foreach(DEVICE ${USB_DEVICES})
-        string(REPLACE ":" ";" DEVICE_LIST ${DEVICE})
-        # Розбиваємо рядок за допомогою списку (перший елемент - VID, другий - PID)
-        list(GET DEVICE_LIST 0 VID)
-        list(GET DEVICE_LIST 1 PID)
-
-
         file(APPEND "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules"
             "\n # Device ${VID}:${PID}\n")
         file(APPEND "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules"
@@ -203,7 +237,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /
         )
     endforeach()
 
-    install(FILES "${CMAKE_BINARY_DIR}/50-${PROJECT_NAME}.rules" DESTINATION /etc/udev/rules.d/)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/50-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/99-${PROJECT_NAME}.rules DESTINATION /etc/udev/rules.d/)
 
 
 
@@ -238,11 +273,8 @@ install(PROGRAMS ${CMAKE_SOURCE_DIR}/default.script DESTINATION /usr/share/udhcp
 set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_VENDOR "Quectel Wireless Solution, Co., Ltd.")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Quectel Wireless Solution, Co., Ltd.")
-set(CPACK_PACKAGE_CONTACT "Sam4uk")# or CPACK_DEBIAN_PACKAGE_MAINTAINER)
+set(CPACK_PACKAGE_CONTACT "Sam4uk") # or CPACK_DEBIAN_PACKAGE_MAINTAINER)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= ${GLIBC_VERION})")
-set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 
 # Автоматичне визначення архітектури для CPack
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
@@ -262,7 +294,7 @@ if(NOT CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
     endif()
 endif()
 
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}")
 set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_SOURCE_DIR}/decription)
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${PROJECT_DESCRIPTION})
